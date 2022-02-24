@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <title>捕鱼达人</title>
+    <style media="screen">
+      *{padding:0;margin:0}
+      body{
+        background:black;
+        text-align:center;
+      }
+      #canvas{
+        background:white;
+        margin-top:50px;
+        background:url('./img/game_bg_2_hd.jpg') no-repeat;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas" width="1024" height="768"></canvas>
+    <script src="./js/config.js" charset="utf-8"></script>
+    <script src="./js/common.js" charset="utf-8"></script>
+    <script src="./js/ElementProperty.js" charset="utf-8"></script>
+    <script src="./js/Sprite.js" charset="utf-8"></script>
+    <script src="./js/Button.js" charset="utf-8"></script>
+    <script src="./js/Fish.js" charset="utf-8"></script>
+    <script src="./js/Cannon.js" charset="utf-8"></script>
+    <script src="./js/Money.js" charset="utf-8"></script>
+    <script src="./js/Bullet.js" charset="utf-8"></script>
+    <script src="./js/CoinAni.js" charset="utf-8"></script>
+    <script src="./js/BulletEffect.js" charset="utf-8"></script>
+    <script type="text/javascript">
+      let GlobalImgObj='';
+
+      window.onload=function(){
+        var clientW =document.documentElement.clientWidth;
+        var canvas= $('#canvas');
+        let cW =canvas.width;
+        let cH =canvas.height;
+        const cannonX =560;
+        const cannonY =739;
+        let cannonAng = 0;
+        let currentMoney =100000;
+        const wallet ={"x":185,"y":753};
+
+        let bullets=[];
+        let bulletEffects=[];
+        let fishs=[];
+        let coinAnis=[];
+        let scores=[];
+        let cannonTime =0;
+
+        let playCannon=false;
+        let fishMaxval=30;
+        loadImg(staticImage,function(imgObj){
+          GlobalImgObj=imgObj;
+          let gd =canvas.getContext('2d');
+          var fort =new Sprite(new ElementProperty(imgObj.fort,0,0,756,71),cW/2,cH-71/2+1,0);
+          var plusCannon =new Button('fort_plus',43.5,75,43.5,28,cannonX+70,cH-71/2,0);
+          var subtractCannon =new Button('fort_subtract',130.5,75,43.5,28,cannonX-70,cH-71/2,0);
+          let cannon =new Cannon(1,cannonX,cannonY,cannonAng);
+          let money =new Money(new ElementProperty(imgObj.number_black,0,0),500,500,0);
+
+          for(var i=0;i<6;i++){
+            scores.push(new Sprite(new ElementProperty(GlobalImgObj['number_black'],0,216,20,24),163+i*23,755));
+          }
+
+          (function animation (){
+            requestAniFrame(animation);
+            gd.clearRect(0,0,canvas.width,canvas.height);
+            //生成fish
+            if(randomNum(1,50)==1&&fishs.length<=fishMaxval-1){
+              var x=0;
+              var y=0;
+              var rotation=0;
+              var scale =1;
+              if(randomNum(-100,cW+100)>=(cW+200)/2){
+                x=cW+100;
+                rotation=randomNum(-225,-135);;
+                scale =-1;
+              }else{
+                x=-100;
+                rotation=randomNum(-45,45);
+              }
+                // x=300;
+                // rotation=180;
+                // y=300;
+              y=randomNum(10,cH-10);
+              var fish =new Fish(randomNum(1,10),x,y,rotation,scale);
+              fishs.push(fish);
+            }
+            //循环fish
+            fishs=fishs.filter((item) => {
+              if(item.outFoRect(cW,cH,100)){
+                return false
+              }
+              item.swim(gd);
+              // console.log(!item.fishAlive);
+              if(item.fishAlive){
+                // console.log(11);
+                // this.speed=0;
+              //   console.log(1);
+                // item.speed=0;
+                var time =setTimeout(function(){
+                  // item.swim(gd)
+                  fishs=fishs.filter(fish =>{
+                    if(fish==item){
+                      var i=0;
+                      var Mtime =setInterval(function(){
+                        // console.log(coinAnis);
+                          coinAnis.push(new CoinAni(1,fish.x,fish.y,0));
+                          i++;
+                          if(i>=fish.moneyNum){
+                            clearTimeout(Mtime);
+                          }
+                        },500)
+                    }
+                    return fish!=item;
+                  });
+
+                  clearTimeout(time);
+                },1000)
+              // }else{
+              }
+
+              return true;
+            })
+            //钱
+            coinAnis=coinAnis.filter(item=>{
+              item.draw(gd);
+              item.nextFrame();
+              item.MoneyMove(wallet.x,wallet.y);
+              if(Math.abs(item.x-wallet.x)<=10&&Math.abs(item.y-wallet.y)<=10){
+                currentMoney+=100;
+                return false;
+              }
+              return true;
+            })
+            //底座
+            fort.draw(gd);
+            //导弹特效
+            bulletEffects=bulletEffects.filter(item=>{
+              if(item.outFoRect(cW,cH,100)){
+                return false
+              }
+              item.draw(gd);
+              item.move();
+              return true;
+            })
+            //导弹
+            bullets=bullets.filter(item=>{
+              var old =false;
+              if(item.outFoRect(cW,cH,100)){
+                // old=false;
+                return false
+              }
+              item.draw(gd);
+              item.move();
+              if(!old){
+                fishs=fishs.filter(si=>{
+                  // console.log(bulletEffects);
+                  if(!si.fishAlive){
+                    if(Math.sqrt(Math.pow(item.x-si.x,2)+Math.pow(item.y-si.y,2))<=item.r+si.r){
+
+                      bulletEffects=bulletEffects.filter(bu=>{
+                        return !(Math.sqrt(Math.pow(item.x-si.x,2)+Math.pow(item.y-si.y,2))<=item.r+si.r);
+                      })
+
+                      old=true;
+                      si.fishAlive=true;
+                    }
+                  }else{
+                    old =false;
+                  }
+                  return true;
+                })
+              }
+              return !old;
+            })
+
+            // money.drawMoney(gd,currentMoney);
+            //按钮
+            plusCannon.draw(gd);
+            subtractCannon.draw(gd);
+            //炮塔
+            cannon.drawCannon(gd,cannonAng);
+            if(playCannon){
+              playCannon=cannon.nextFrame('y');
+            }
+            //积分板
+            var currentMoneyStr=currentMoney+"";
+            while(currentMoneyStr.length<6){
+              currentMoneyStr='0'+currentMoneyStr;
+            }
+            scores.forEach((item,index)=>{
+              item.setDraw(new ElementProperty(GlobalImgObj['number_black'],0,(9-parseInt(currentMoneyStr[index]))*24,20,24),163+i*23,755)
+              item.draw(gd);
+            })
+          })();
+
+          plusCannon.callout=function(){
+            console.log("plusCannon");
+            if(cannon.type<cannon.Numbers){
+              cannon.type++;
+            }else{
+              cannon.type=1;
+            }
+            cannon.setType(cannon.type);
+          };
+          subtractCannon.callout=function(){
+            console.log('subtractCannon');
+            if(cannon.type>1){
+              cannon.type--;
+            }else{
+              cannon.type=cannon.Numbers;
+            }
+            cannon.setType(cannon.type);
+          };
+
+          var aBtn =[plusCannon,subtractCannon];
+          canvas.addEventListener('mousedown',function(ev){
+            var x =ev.offsetX;
+            var y =ev.offsetY;
+            aBtn.forEach(item=>{
+              item.down(x,y);
+            })
+          },false)
+          canvas.addEventListener('mousemove',function(ev){
+              var x= ev.offsetX;
+              var y =ev.offsetY;
+              let a =x-cannonX;
+              let b =y-cannonY;
+              cannonAng=rta(Math.atan2(b,a))+90;
+              if(cannonAng>90&&cannonAng<180){
+                cannonAng=90
+              }
+              if(cannonAng<-90||cannonAng>180){
+                cannonAng=-90
+              }
+          },false)
+          canvas.addEventListener('mouseup',function(ev){
+            var x =ev.offsetX;
+            var y =ev.offsetY;
+            // 按钮
+            aBtn.forEach(item=>{
+              item.up(x,y);
+            })
+            //现在炮弹点击间隔
+            if(Date.now()-cannonTime>800){
+              // console.log((currentMoney-=(cannon.type*100)));
+              if((currentMoney-(cannon.type*100))>-1){
+                cannonTime=Date.now();
+                bullets.push(new Bullet(cannon.type,cannon.x,cannon.y,cannon.rotating));
+                bulletEffects.push(new BulletEffect(cannon.type,cannon.x,cannon.y,cannon.rotating));
+                playCannon=true;
+                currentMoney-=(cannon.type*100);
+              }else{
+                alert('金币用完了');
+              }
+            }
+          },false)
+        })
+      }
+    </script>
+  </body>
+</html>
